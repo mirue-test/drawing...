@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Drawing</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+        canvas {
+            border: 1px solid black;
+            max-width: 95vw;
+            max-height: 85vh;
+            margin-bottom: 10px;
+            touch-action: none; /* Disable default touch actions on canvas */
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            position: absolute;
+            bottom: 7px;
+            left: 10px;
+            right: 10px;
+        }
+        .controls button {
+            padding: 1%;
+            margin: 1%;
+            border: 1px solid #000;
+            background-color: #f0f0f0;
+            cursor: pointer;
+            width: 6%;
+            height: 3vh;
+            font-size: min(2vw, 2vh);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .controls button:active {
+            box-shadow: inset 0 0 5px #000;
+        }
+        .controls button.active {
+            background-color: #ff0000;
+        }
+        .controls input[type="number"] {
+            width: 5vw;
+            height: 4vh;
+            font-size: min(1vw, 1vh);
+            padding: 0.5%;
+            margin: 1%;
+        }
+        .controls .pen-width-controls, .controls .eraser-width-controls {
+            display: flex;
+            align-items: center;
+        }
+        .controls .pen-width-controls button, .controls .eraser-width-controls button {
+            padding: 8px; /* Adjust padding for buttons */
+            margin: 0 5px;
+            font-size: 1.2em; /* Adjust font size for buttons */
+            width: auto; /* Allow buttons to grow */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Interactive Drawing</h2>
+        <canvas id="drawingCanvas"></canvas>
+        <div class="controls">
+            <button id="penButton" onclick="usePen()">Pen</button>
+            <button id="eraserButton" onclick="useEraser()">Eraser</button>
+            <button onclick="pickColor()">Color</button>
+            <div class="pen-width-controls">
+                <button onclick="increasePenWidth()">+</button>
+                <input type="number" id="penWidthInput" placeholder="Pen Width" value="2">
+                <button onclick="decreasePenWidth()">-</button>
+            </div>
+            <div class="eraser-width-controls">
+                <button onclick="increaseEraserWidth()">+</button>
+                <input type="number" id="eraserWidthInput" placeholder="Eraser Width" value="10">
+                <button onclick="decreaseEraserWidth()">-</button>
+            </div>
+            <button onclick="clearCanvas()">Clear</button>
+            <button onclick="saveCanvas()">Save</button>
+            <input type="file" id="loadCanvas" accept="image/*">
+        </div>
+        <input type="color" id="colorPicker" style="display: none;">
+    </div>
+
+    <script>
+        const titleElement = document.querySelector('h2');
+        titleElement.remove();
+
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let savedImageData = null;
+
+        function resizeCanvas() {
+            if (savedImageData) {
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                tempCtx.putImageData(savedImageData, 0, 0);
+
+                canvas.width = window.innerWidth * 0.95;
+                canvas.height = window.innerHeight * 0.82;
+
+                ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, canvas.width, canvas.height);
+                savedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            } else {
+                canvas.width = window.innerWidth * 0.95;
+                canvas.height = window.innerHeight * 0.82;
+            }
+        }
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let isDrawing = false;
+        let isErasing = false;
+        let penColor = '#000000';
+        let penWidth = 2;
+        let eraserWidth = 10;
+
+        const penButton = document.getElementById('penButton');
+        const eraserButton = document.getElementById('eraserButton');
+
+        function startDrawing(event) {
+            event.preventDefault();
+            isDrawing = true;
+            const x = event.clientX || event.touches[0].clientX;
+            const y = event.clientY || event.touches[0].clientY;
+            ctx.beginPath();
+            ctx.moveTo(x - canvas.offsetLeft, y - canvas.offsetTop);
+        }
+
+        function drawLine(event) {
+            event.preventDefault();
+            if (isDrawing) {
+                const x = event.clientX || event.touches[0].clientX;
+                const y = event.clientY || event.touches[0].clientY;
+                ctx.lineTo(x - canvas.offsetLeft, y - canvas.offsetTop);
+                if (isErasing) {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.lineWidth = eraserWidth;
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.strokeStyle = penColor;
+                    ctx.lineWidth = penWidth;
+                }
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+            savedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        }
+
+        function useEraser() {
+            isErasing = true;
+            penButton.classList.remove('active');
+            eraserButton.classList.add('active');
+        }
+
+        function usePen() {
+            isErasing = false;
+            eraserButton.classList.remove('active');
+            penButton.classList.add('active');
+        }
+
+        function pickColor() {
+            const colorPicker = document.getElementById('colorPicker');
+            colorPicker.click();
+        }
+
+        const colorPicker = document.getElementById('colorPicker');
+        colorPicker.addEventListener('input', function() {
+            penColor = colorPicker.value;
+            if (!isErasing) {
+                ctx.strokeStyle = penColor;
+            }
+        });
+
+        const penWidthInput = document.getElementById('penWidthInput');
+        penWidthInput.addEventListener('input', function() {
+            penWidth = parseInt(penWidthInput.value);
+            if (!isNaN(penWidth)) {
+                ctx.lineWidth = penWidth;
+            }
+        });
+
+        const eraserWidthInput = document.getElementById('eraserWidthInput');
+        eraserWidthInput.addEventListener('input', function() {
+            eraserWidth = parseInt(eraserWidthInput.value);
+            if (!isNaN(eraserWidth)) {
+                ctx.lineWidth = eraserWidth;
+            }
+        });
+
+        function increasePenWidth() {
+            penWidth += 1;
+            penWidthInput.value = penWidth;
+            ctx.lineWidth = penWidth;
+        }
+
+        function decreasePenWidth() {
+            if (penWidth > 1) {
+                penWidth -= 1;
+                penWidthInput.value = penWidth;
+                ctx.lineWidth = penWidth;
+            }
+        }
+
+        function increaseEraserWidth() {
+            eraserWidth += 1;
+            eraserWidthInput.value = eraserWidth;
+            ctx.lineWidth = eraserWidth;
+        }
+
+        function decreaseEraserWidth() {
+            if (eraserWidth > 1) {
+                eraserWidth -= 1;
+                eraserWidthInput.value = eraserWidth;
+                ctx.lineWidth = eraserWidth;
+            }
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            savedImageData = null;
+        }
+
+        function saveCanvas() {
+            // Save current canvas image before setting background color
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(canvas, 0, 0);
+
+            // Set background color
+            ctx.fillStyle = '#ffffff'; // 배경 색상 설정
+            ctx.fillRect(0, 0, canvas.width, canvas.height); // 전체 캔버스에 색상 채우기
+
+            // Restore saved image
+            ctx.drawImage(tempCanvas, 0, 0);
+
+            // Save canvas as image
+            const image = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = image;
+            link.download = 'drawing.png';
+            link.click();
+
+            // Clear background color
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            savedImageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
+            ctx.putImageData(savedImageData, 0, 0);
+        }
+
+        window.addEventListener('load', () => {
+            const loadCanvas = document.getElementById('loadCanvas');
+            loadCanvas.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        clearCanvas();
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        savedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    };
+                    img.src = event.target.result;
+                };
+                if (file) {
+                    reader.readAsDataURL(file);
+                }
+            });
+        });
+
+        // Event listeners for drawing on canvas
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', drawLine);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', drawLine);
+        canvas.addEventListener('touchend', stopDrawing);
+
+    </script>
+</body>
+</html>
